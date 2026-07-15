@@ -1,0 +1,6 @@
+{
+  "name": "Litron VPN Architect",
+  "description": "An interactive workspace to generate production-ready server setup scripts, explore cross-platform mobile VPN client source code, and simulate the Litron-inspired user interface in real-time.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
