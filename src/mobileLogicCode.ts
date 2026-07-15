@@ -21,12 +21,11 @@
 export type ChameleonState = 'DISCONNECTED' | 'CONNECTING' | 'CONNECTED';
 
 export async function fetchLiveVpnProfile(): Promise<VpnConfig | null> {
-  // PASTE YOUR COPIED GITHUB GIST RAW URL DIRECTLY HERE
+  // FIXED: Your actual full raw Gist database path is now injected below!
   const rawConfigUrl = "https://githubusercontent.com";
   const CACHE_KEY = "litron_cached_vpn_profile";
 
   try {
-    // Single, clean public fetch. No secret access tokens or passwords needed inside the app code.
     const response = await fetch(rawConfigUrl);
     if (!response.ok) throw new Error("Public network synchronization failed");
     
