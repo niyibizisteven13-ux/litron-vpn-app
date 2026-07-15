@@ -1,5 +1,8 @@
 ﻿import React, { useState, useEffect, useRef } from 'react';
+import { registerPlugin } from '@capacitor/core';
 import { fetchLiveVpnProfile, VpnTimerManager, ChameleonState, VpnConfig } from './mobileLogicCode';
+
+const AmneziaVpnBridge = registerPlugin<any>('AmneziaVpnBridge');
 
 export default function App() {
   const [uiState, setUiState] = useState<ChameleonState>('DISCONNECTED');
@@ -51,9 +54,20 @@ export default function App() {
 
     if (config) {
       setActiveConfig(config);
-      setTimeout(() => {
+      try {
+        await AmneziaVpnBridge.startSystemTunnel({
+          endpoint_ip: config.endpoint_ip,
+          server_public_key: config.server_public_key,
+          client_private_key: config.client_private_key,
+          jc: config.obfuscation.jc,
+          jv: config.obfuscation.jv,
+        });
         setUiState('CONNECTED');
-      }, 2000);
+      } catch (pluginError) {
+        console.error('Native tunnel startup failed:', pluginError);
+        alert('Connection failure. Failed to start the native VPN tunnel.');
+        setUiState('DISCONNECTED');
+      }
     } else {
       alert("Connection failure. Unable to pull server routing configurations.");
       setUiState('DISCONNECTED');
