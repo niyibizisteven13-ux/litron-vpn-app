@@ -21,7 +21,7 @@ export interface VpnConfig {
 export type ChameleonState = "DISCONNECTED" | "CONNECTING" | "CONNECTED";
 
 export async function fetchLiveVpnProfile(): Promise<VpnConfig | null> {
-  const rawConfigUrl = "https://githubusercontent.com";
+  const rawConfigUrl = "https://raw.githubusercontent.com/niyibizisteven13-ux/litron-vpn-app/refs/heads/main/server-config.json";
   const CACHE_KEY = "litron_cached_vpn_profile";
 
   try {
@@ -50,7 +50,7 @@ export class VpnTimerManager {
     localStorage.setItem(this.STORAGE_KEY, seconds.toString());
   }
 
-  static addRewardTime(): number {
+  static addRewardTime(): number  {
     const currentBalance = this.getRemainingTime();
     const newBalance = currentBalance + 7200;
     this.saveRemainingTime(newBalance);
