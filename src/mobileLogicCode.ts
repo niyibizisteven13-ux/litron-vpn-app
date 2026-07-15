@@ -1,4 +1,4 @@
-﻿export interface VpnConfig {
+export interface VpnConfig {
   server_name: string;
   endpoint_ip: string;
   endpoint_port: number;
@@ -18,10 +18,9 @@
   };
 }
 
-export type ChameleonState = 'DISCONNECTED' | 'CONNECTING' | 'CONNECTED';
+export type ChameleonState = "DISCONNECTED" | "CONNECTING" | "CONNECTED";
 
 export async function fetchLiveVpnProfile(): Promise<VpnConfig | null> {
-  // FIXED: Your actual full raw Gist database path is now injected below!
   const rawConfigUrl = "https://githubusercontent.com";
   const CACHE_KEY = "litron_cached_vpn_profile";
 
