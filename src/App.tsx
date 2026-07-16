@@ -1,5 +1,7 @@
 ﻿import React, { useState, useEffect, useRef } from 'react';
 import { registerPlugin } from '@capacitor/core';
+// 1. Import the Tauri bridge invoke tool 
+import { invoke } from '@tauri-apps/api/tauri';
 import { fetchLiveVpnProfile, VpnTimerManager, ChameleonState, VpnConfig } from './mobileLogicCode';
 
 const AmneziaVpnBridge = registerPlugin<any>('AmneziaVpnBridge');
@@ -19,10 +21,10 @@ export default function App() {
   useEffect(() => {
     if (uiState === 'CONNECTED' && timeRemaining > 0) {
       timerRef.current = setInterval(() => {
-        setTimeRemaining((prev) => {
+        setTimeRemaining((prev: number) => {
           if (prev <= 1) {
             clearInterval(timerRef.current!);
-            setUiState('CONNECTED');
+            setUiState('DISCONNECTED'); // Restored normal behavior on countdown end
             VpnTimerManager.saveRemainingTime(0);
             return 0;
           }
@@ -45,7 +47,7 @@ export default function App() {
     }
 
     if (uiState === 'CONNECTED') {
-      setUiState('CONNECTED');
+      setUiState('DISCONNECTED');
       return;
     }
 
@@ -54,23 +56,43 @@ export default function App() {
 
     if (config) {
       setActiveConfig(config);
-      try {
-        await AmneziaVpnBridge.startSystemTunnel({
-          endpoint_ip: config.endpoint_ip,
-          server_public_key: config.server_public_key,
-          client_private_key: config.client_private_key,
-          jc: config.obfuscation.jc,
-          jv: config.obfuscation.jv,
-        });
-        setUiState('CONNECTED');
-      } catch (pluginError) {
-        console.error('Native tunnel startup failed:', pluginError);
-        setChameleonState('CONNECTED');
-        setUiState('CONNECTED');
+      
+      // Check if running inside a Tauri Desktop environment
+      if ((window as any).__TAURI_METADATA__) {
+        try {
+          // 2. Invoke the native desktop Rust tunnel engine
+          const response = await invoke<string>('start_vpn_tunnel', {
+            endpointIp: config.endpoint_ip,
+            privateKey: config.client_private_key,
+            address: config.client_address
+          });
+          console.log('Rust Desktop Core Status:', response);
+          setUiState('CONNECTED');
+        } catch (desktopError) {
+          console.error('Desktop native core startup failed:', desktopError);
+          alert('Failed to initialize desktop system core adapters: ' + desktopError);
+          setUiState('DISCONNECTED');
+        }
+      } else {
+        // Fallback to mobile Capacitor native plug-ins if running on a phone
+        try {
+          await AmneziaVpnBridge.startSystemTunnel({
+            endpoint_ip: config.endpoint_ip,
+            server_public_key: config.server_public_key,
+            client_private_key: config.client_private_key,
+            jc: config.obfuscation.jc,
+            jv: config.obfuscation.jv,
+          });
+          setUiState('CONNECTED');
+        } catch (pluginError) {
+          console.error('Mobile native tunnel startup failed:', pluginError);
+          alert('Native mobile plugin interface not found.');
+          setUiState('DISCONNECTED');
+        }
       }
     } else {
       alert("Connection failure. Unable to pull server routing configurations.");
-      setUiState('CONNECTED');
+      setUiState('DISCONNECTED');
     }
   };
 
