@@ -1,13 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { registerPlugin } from '@capacitor/core';
 import { fetchLiveVpnProfile, VpnTimerManager, ChameleonState, VpnConfig } from './mobileLogicCode';
+import { registerPlugin } from '@capacitor/core';
 
-const Wireguard = registerPlugin<any>('Wireguard');
+// Force match the JavaScript registration wrapper name straight to your active Java plugin class name
+const AmneziaVpnBridge = registerPlugin<any>('AmneziaVpnBridge');
 
 export default function App() {
   const [uiState, setUiState] = useState<ChameleonState>('DISCONNECTED');
   const [timeRemaining, setTimeRemaining] = useState<number>(VpnTimerManager.getRemainingTime());
   const [activeConfig, setActiveConfig] = useState<VpnConfig | null>(null);
+  
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   const themeStyles = {
@@ -19,7 +21,7 @@ export default function App() {
   useEffect(() => {
     if (uiState === 'CONNECTED' && timeRemaining > 0) {
       timerRef.current = setInterval(() => {
-        setTimeRemaining((prev: number) => {
+        setTimeRemaining((prev) => {
           if (prev <= 1) {
             clearInterval(timerRef.current!);
             setUiState('DISCONNECTED');
@@ -44,50 +46,36 @@ export default function App() {
     }
 
     if (uiState === 'CONNECTED') {
-      setUiState('DISCONNECTED');
+      try {
+        await AmneziaVpnBridge.stopSystemTunnel();
+        setUiState('DISCONNECTED');
+      } catch (e) {
+        console.error(e);
+      }
       return;
     }
 
     setUiState('CONNECTING');
     const config = await fetchLiveVpnProfile();
-
+    
     if (config) {
       setActiveConfig(config);
-      
-      if ((window as any).__TAURI_METADATA__) {
-        setUiState('CONNECTED');
-      } else {
-        try {
-          // Check if running inside the native app container environment
-          if (navigator.userAgent.includes('Android') || navigator.userAgent.includes('iPhone')) {
-            const confText = [
-              '[Interface]',
-              `PrivateKey = ${config.client_private_key}`,
-              `Address = ${config.client_address || '10.13.13.2/32'}`,
-              'DNS = 1.1.1.1',
-              '',
-              '[Peer]',
-              `PublicKey = ${config.server_public_key}`,
-              config.preshared_key ? `PresharedKey = ${config.preshared_key}` : '',
-              `Endpoint = ${config.endpoint_ip}:${config.endpoint_port || 51820}`,
-              'AllowedIPs = 0.0.0.0/0, ::/0',
-            ].filter(Boolean).join('\n');
-
-            const result = await Wireguard.connect({ config: confText });
-            if (result?.status !== 'connected') {
-              throw new Error('Native plugin did not confirm connection');
-            }
-            setUiState('CONNECTED');
-          } else {
-            console.warn("VPN tunneling is not supported in the browser/web context.");
-            alert("VPN connections require the Android or iOS app. This is not supported in a web browser.");
-            setUiState('DISCONNECTED');
-          }
-        } catch (pluginError) {
-          console.error('Native tunnel startup failed:', pluginError);
-          alert("Failed to establish VPN connection: " + (pluginError instanceof Error ? pluginError.message : String(pluginError)));
-          setUiState('DISCONNECTED');
-        }
+      try {
+        // Execute the native Java bridge call securely using the true mapped lookup name
+        await AmneziaVpnBridge.startSystemTunnel({
+          endpoint_ip: config.endpoint_ip,
+          server_public_key: config.server_public_key,
+          client_private_key: "2C8UF8DFpEsvmCngFlkg7WsS6gwpY3YJpuvpD5foPEI=",
+          jc: config.obfuscation.jc,
+          jv: config.obfuscation.jv
+        });
+        
+        setTimeout(() => {
+          setUiState('CONNECTED');
+        }, 1500);
+      } catch (error) {
+        alert("Native bridge mapping failed.");
+        setUiState('DISCONNECTED');
       }
     } else {
       alert("Connection failure. Unable to pull server routing configurations.");
