@@ -1,0 +1,8 @@
+{
+  "appId": "com.litron.vpn",
+  "appName": "Litron VPN",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https"
+  }
+}
