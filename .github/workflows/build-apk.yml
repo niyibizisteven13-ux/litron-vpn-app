@@ -1,43 +1,99 @@
-name: Build Android APK
+name: Build Litron Android APK
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
 
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout Source Code
         uses: actions/checkout@v4
 
-      - name: Set up Java 21 Env
+      - name: Setup Node.js Environment
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Setup Java JDK Compiler
         uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
           java-version: '21'
 
-      - name: Initialize Node.js Compiler
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
+      - name: Install Application Dependencies
+        run: npm ci
 
-      - name: Install Frontend Packages
-        run: npm ci || npm install
-
-      - name: Build Production Web Assets
+      - name: Compile Frontend Assets
         run: npm run build
 
-      - name: Synchronize Capacitor Native Layers
+      - name: Force Sync Native Configuration Profiles
         run: npx cap sync android
 
-      - name: Grant Gradle Permissions
-        run: chmod +x android/gradlew
+      - name: Hard-Inject Valid Android Manifest Namespaces
+        run: |
+          cat << 'XML' > android/app/src/main/AndroidManifest.xml
+          <?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://android.com">
 
-      - name: Compile Standalone APK Bundle
-        run: cd android && ./gradlew assembleDebug --no-daemon
+              <uses-permission android:name="android.permission.INTERNET" />
+              <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+              <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
-      - name: Upload Finished Installer to GitHub
+              <application
+                  android:allowBackup="true"
+                  android:icon="@mipmap/ic_launcher"
+                  android:label="@string/app_name"
+                  android:roundIcon="@mipmap/ic_launcher_round"
+                  android:supportsRtl="true"
+                  android:theme="@style/AppTheme">
+
+                  <activity
+                      android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|layoutDirection|fontScale|screenLayout|density"
+                      android:name="com.litron.vpn.MainActivity"
+                      android:label="@string/title_activity_main"
+                      android:theme="@style/AppTheme.NoActionBarLauncher"
+                      android:exported="true">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+                  </activity>
+
+                  <provider
+                      android:name="com.getcapacitor.CapacitorFileProvider"
+                      android:authorities="\${applicationId}.fileprovider"
+                      android:exported="false"
+                      android:grantUriPermissions="true">
+                      <meta-data
+                          android:name="android.support.FILE_PROVIDER_PATHS"
+                          android:resource="@xml/file_paths" />
+                  </provider>
+
+                  <service
+                      android:name="com.litron.vpn.LitronVpnService"
+                      android:permission="android.permission.BIND_VPN_SERVICE"
+                      android:exported="false">
+                      <intent-filter>
+                          <action android:name="android.net.VpnService"/>
+                      </intent-filter>
+                  </service>
+
+              </application>
+          </manifest>
+          XML
+
+      - name: Compile Production APK File
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Export Ready Installation Binary Artifact
         uses: actions/upload-artifact@v4
         with:
           name: litron-vpn-app
