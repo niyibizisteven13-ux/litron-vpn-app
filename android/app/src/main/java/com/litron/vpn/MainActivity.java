@@ -15,6 +15,7 @@ public class MainActivity extends BridgeActivity {
     protected void onCreate(Bundle savedInstanceState) {
         registerPlugin(AmneziaVpnBridge.class);
         super.onCreate(savedInstanceState);
+        registerPlugin(AmneziaVpnBridge.class);
     }
 }
 

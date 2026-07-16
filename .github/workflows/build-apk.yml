@@ -1,4 +1,4 @@
-name: Build Litron Android APK
+name: Build Android APK
 
 on:
   push:
@@ -11,34 +11,33 @@ jobs:
       - name: Checkout Source Code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js Environment
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: 'npm'
-
-      - name: Install Project Dependencies
-        run: |
-          npm install
-          npm run build
-
-      - name: Setup Java JDK Compiler
+      - name: Set up Java 17 Env
         uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
-          java-version: '21'
+          java-version: '17'
 
-      - name: Initialize Capacitor Android Structure
-        run: |
-          npx cap sync android
+      - name: Initialize Node.js Compiler
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
 
-      - name: Compile Production APK File
-        run: |
-          cd android
-          chmod +x gradlew
-          ./gradlew assembleDebug
+      - name: Install Frontend Packages
+        run: npm ci || npm install
 
-      - name: Upload Downloadable APK Asset
+      - name: Build Production Web Assets
+        run: npm run build
+
+      - name: Synchronize Capacitor Native Layers
+        run: npx cap sync android
+
+      - name: Grant Gradle Permissions
+        run: chmod +x android/gradlew
+
+      - name: Compile Standalone APK Bundle
+        run: cd android && ./gradlew assembleDebug
+
+      - name: Upload Finished Installer to GitHub
         uses: actions/upload-artifact@v4
         with:
           name: litron-vpn-app
