@@ -5,9 +5,8 @@ import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
     @Override
-    public void onCreate(Bundle savedInstanceState) {
+    protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        // Register the bridge plugin explicitly inside your custom package domain
         registerPlugin(AmneziaVpnBridge.class);
     }
 }
