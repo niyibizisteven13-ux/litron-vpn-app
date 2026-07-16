@@ -18,7 +18,7 @@ import com.wireguard.config.Config;
 import java.io.BufferedReader;
 import java.io.StringReader;
 
-@CapacitorPlugin(name = "Wireguard")
+@CapacitorPlugin(name="WireguardPlugin")
 public class WireguardPlugin extends Plugin {
 
     private GoBackend backend;
