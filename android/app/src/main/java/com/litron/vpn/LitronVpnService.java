@@ -27,11 +27,10 @@ public class LitronVpnService extends VpnService implements Runnable {
         try {
             Log.i(TAG, "Initializing Native AmneziaWG Tunnel Core via AWS Endpoint...");
             
-            // Establish the System Virtual Network Interface Card (TUN Device Wrapper)
             Builder builder = new Builder();
             mInterface = builder.setMtu(1420)
                     .addAddress("10.0.0.2", 32) 
-                    .addRoute("0.0.0.0", 0)     // FORCE 100% of global phone traffic through the VPN
+                    .addRoute("0.0.0.0", 0)
                     .addDnsServer("1.1.1.1")    
                     .setSession("LitronAWSNode")
                     .establish();
