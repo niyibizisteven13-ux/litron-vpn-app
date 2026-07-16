@@ -1,48 +1,39 @@
 name: Build Litron Android APK
-
 on:
   push:
     branches:
       - main
-
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout Source Code
         uses: actions/checkout@v4
-
       - name: Setup Node.js Environment
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: 'npm'
-
       - name: Setup Java JDK Compiler
         uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
           java-version: '21'
-
       - name: Install Application Dependencies
         run: npm ci
-
       - name: Compile Frontend Assets
         run: npm run build
-
       - name: Force Sync Native Configuration Profiles
         run: npx cap sync android
-
-      - name: Hard-Inject Valid Android Manifest Namespaces via Python
-        run: python3 fix-manifest.py
-
+      - name: Verify Manifest Namespace Integrity
+        run: |
+          grep -q 'xmlns:android="http://schemas.android.com/apk/res/android"' android/app/src/main/AndroidManifest.xml || \
+          (echo "AndroidManifest.xml has an invalid or missing namespace!" && exit 1)
       - name: Compile Production APK File
         run: |
           cd android
           chmod +x gradlew
           ./gradlew assembleDebug --no-daemon
-
       - name: Export Ready Installation Binary Artifact
         uses: actions/upload-artifact@v4
         with:
