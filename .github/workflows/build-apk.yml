@@ -20,7 +20,7 @@ jobs:
       - name: Initialize Node.js Compiler
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22' # Fixed to meet Capacitor CLI version demands
 
       - name: Install Frontend Packages
         run: npm ci || npm install
