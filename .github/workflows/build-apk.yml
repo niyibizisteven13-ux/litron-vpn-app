@@ -11,11 +11,11 @@ jobs:
       - name: Checkout Source Code
         uses: actions/checkout@v4
 
-      - name: Set up Java 17 Env
+      - name: Set up Java 21 Env
         uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
-          java-version: '17'
+          java-version: '21'
 
       - name: Initialize Node.js Compiler
         uses: actions/setup-node@v4
