@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { fetchAllVpnProfiles, VpnTimerManager, ChameleonState, VpnConfig } from './mobileLogicCode';
 import { registerPlugin } from '@capacitor/core';
 
-const AmneziaVpnBridge = registerPlugin<any>('AmneziaVpnBridge');
+const Wireguard = registerPlugin<any>('Wireguard');
 
 export default function App() {
   const [uiState, setUiState] = useState<ChameleonState>('DISCONNECTED');
@@ -57,10 +57,11 @@ export default function App() {
 
     if (uiState === 'CONNECTED') {
       try {
-        await AmneziaVpnBridge.stopSystemTunnel();
+        await Wireguard.disconnect();
         setUiState('DISCONNECTED');
       } catch (e) {
         console.error(e);
+        setUiState('DISCONNECTED');
       }
       return;
     }
@@ -73,19 +74,27 @@ export default function App() {
     setUiState('CONNECTING');
     
     try {
-      await AmneziaVpnBridge.startSystemTunnel({
-        endpoint_ip: selectedServer.endpoint_ip,
-        server_public_key: selectedServer.server_public_key,
-        client_private_key: "2C8UF8DFpEsvmCngFlkg7WsS6gwpY3YJpuvpD5foPEI=",
-        jc: selectedServer.obfuscation.jc,
-        jv: selectedServer.obfuscation.jv
-      });
-      
-      setTimeout(() => {
-        setUiState('CONNECTED');
-      }, 1500);
+      const confText = [
+        '[Interface]',
+        `PrivateKey = ${selectedServer.client_private_key}`,
+        `Address = ${selectedServer.client_address}`,
+        'DNS = 1.1.1.1',
+        '',
+        '[Peer]',
+        `PublicKey = ${selectedServer.server_public_key}`,
+        selectedServer.preshared_key ? `PresharedKey = ${selectedServer.preshared_key}` : '',
+        `Endpoint = ${selectedServer.endpoint_ip}:${selectedServer.endpoint_port}`,
+        'AllowedIPs = 0.0.0.0/0, ::/0',
+      ].filter(Boolean).join('\n');
+
+      const result = await Wireguard.connect({ config: confText });
+      if (result?.status !== 'connected') {
+        throw new Error('Native plugin did not confirm connection');
+      }
+      setUiState('CONNECTED');
     } catch (error) {
-      alert("Native bridge routing lookup failure.");
+      console.error('Tunnel connect failed:', error);
+      alert("Failed to establish VPN connection: " + (error instanceof Error ? error.message : String(error)));
       setUiState('DISCONNECTED');
     }
   };
