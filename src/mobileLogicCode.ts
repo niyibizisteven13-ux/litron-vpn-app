@@ -21,7 +21,7 @@ export interface VpnConfig {
 export type ChameleonState = 'DISCONNECTED' | 'CONNECTING' | 'CONNECTED';
 
 export async function fetchLiveVpnProfile(): Promise<VpnConfig | null> {
-  const rawConfigUrl = "https://githubusercontent.com";
+  const rawConfigUrl = "https://gist.githubusercontent.com/niyibizisteven13-ux/746f4394fa1a51a084bfb209b5aa662f/raw/config.json";
   const CACHE_KEY = "litron_cached_vpn_profile";
 
   try {
