@@ -1,14 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { fetchLiveVpnProfile, VpnTimerManager, ChameleonState, VpnConfig } from './mobileLogicCode';
+import { fetchAllVpnProfiles, VpnTimerManager, ChameleonState, VpnConfig } from './mobileLogicCode';
 import { registerPlugin } from '@capacitor/core';
 
-// Force match the JavaScript registration wrapper name straight to your active Java plugin class name
 const AmneziaVpnBridge = registerPlugin<any>('AmneziaVpnBridge');
 
 export default function App() {
   const [uiState, setUiState] = useState<ChameleonState>('DISCONNECTED');
   const [timeRemaining, setTimeRemaining] = useState<number>(VpnTimerManager.getRemainingTime());
-  const [activeConfig, setActiveConfig] = useState<VpnConfig | null>(null);
+  const [servers, setServers] = useState<VpnConfig[]>([]);
+  const [selectedServer, setSelectedServer] = useState<VpnConfig | null>(null);
+  const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(false);
   
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -17,6 +18,15 @@ export default function App() {
     CONNECTING: { bg: '#040E14', accent: '#22D3EE', statusText: 'Establishing handshake...', pulseClass: 'animate-pulse' },
     CONNECTED: { bg: '#05130C', accent: '#10B981', statusText: 'Secured & Encrypted', pulseClass: '' }
   };
+
+  useEffect(() => {
+    async function loadNetwork() {
+      const data = await fetchAllVpnProfiles();
+      setServers(data);
+      if (data.length > 0) setSelectedServer(data[0]);
+    }
+    loadNetwork();
+  }, []);
 
   useEffect(() => {
     if (uiState === 'CONNECTED' && timeRemaining > 0) {
@@ -55,50 +65,36 @@ export default function App() {
       return;
     }
 
+    if (!selectedServer) {
+      alert("Please select a target server location node first!");
+      return;
+    }
+
     setUiState('CONNECTING');
-    const config = await fetchLiveVpnProfile();
     
-    if (config) {
-      setActiveConfig(config);
-      try {
-        // Execute the native Java bridge call securely using the true mapped lookup name
-        await AmneziaVpnBridge.startSystemTunnel({
-          endpoint_ip: config.endpoint_ip,
-          server_public_key: config.server_public_key,
-          client_private_key: "2C8UF8DFpEsvmCngFlkg7WsS6gwpY3YJpuvpD5foPEI=",
-          jc: config.obfuscation.jc,
-          jv: config.obfuscation.jv
-        });
-        
-        setTimeout(() => {
-          setUiState('CONNECTED');
-        }, 1500);
-      } catch (error) {
-        alert("Native bridge mapping failed.");
-        setUiState('DISCONNECTED');
-      }
-    } else {
-      alert("Connection failure. Unable to pull server routing configurations.");
+    try {
+      await AmneziaVpnBridge.startSystemTunnel({
+        endpoint_ip: selectedServer.endpoint_ip,
+        server_public_key: selectedServer.server_public_key,
+        client_private_key: "2C8UF8DFpEsvmCngFlkg7WsS6gwpY3YJpuvpD5foPEI=",
+        jc: selectedServer.obfuscation.jc,
+        jv: selectedServer.obfuscation.jv
+      });
+      
+      setTimeout(() => {
+        setUiState('CONNECTED');
+      }, 1500);
+    } catch (error) {
+      alert("Native bridge routing lookup failure.");
       setUiState('DISCONNECTED');
     }
-  };
-
-  const handleAdWatchReward = () => {
-    const updatedSeconds = VpnTimerManager.addRewardTime();
-    setTimeRemaining(updatedSeconds);
-  };
-
-  const formatDisplayTime = (totalSeconds: number) => {
-    const hrs = Math.floor(totalSeconds / 3600).toString().padStart(2, '0');
-    const mins = Math.floor((totalSeconds % 3600) / 60).toString().padStart(2, '0');
-    const secs = (totalSeconds % 60).toString().padStart(2, '0');
-    return `${hrs}:${mins}:${secs}`;
   };
 
   const currentTheme = themeStyles[uiState];
 
   return (
-    <div style={{ backgroundColor: currentTheme.bg, color: '#FFFFFF', minHeight: '100vh', transition: 'all 0.5s ease' }} className="flex flex-col items-center justify-between p-6 font-sans">
+    <div style={{ backgroundColor: currentTheme.bg, color: '#FFFFFF', minHeight: '100vh', transition: 'all 0.5s ease' }} className="flex flex-col items-center justify-between p-6 font-sans relative overflow-hidden">
+      
       <div className="text-center mt-6">
         <h1 className="text-xs tracking-widest text-gray-500 font-bold uppercase">AMNEZIA BYPASS CORE</h1>
         <p className="text-xl font-extrabold tracking-tight mt-1 text-gray-200">LITRON PROTOCOL</p>
@@ -119,23 +115,61 @@ export default function App() {
           <p className="text-sm font-semibold tracking-wide" style={{ color: currentTheme.accent }}>
             {currentTheme.statusText.toUpperCase()}
           </p>
-          {uiState === 'CONNECTED' && activeConfig && (
-            <p className="text-xs text-gray-400 mt-1">Node: {activeConfig.server_name} ({activeConfig.endpoint_ip})</p>
-          )}
         </div>
       </div>
 
-      <div className="w-full max-w-sm bg-neutral-900/50 backdrop-blur-md rounded-2xl p-5 border border-neutral-800 text-center mb-6">
+      <button 
+        disabled={uiState !== 'DISCONNECTED'}
+        onClick={() => setIsDrawerOpen(true)}
+        className="flex items-center space-x-3 bg-neutral-900/80 border border-neutral-800 rounded-xl px-5 py-3 hover:bg-neutral-800 transition-all text-sm font-medium tracking-wide active:scale-95 disabled:opacity-50"
+      >
+        <span>🌐 {selectedServer ? selectedServer.server_name : "FETCHING LOCATIONS..."}</span>
+        <svg xmlns="http://w3.org" className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      <div className="w-full max-w-sm bg-neutral-900/50 backdrop-blur-md rounded-2xl p-5 border border-neutral-800 text-center mb-6 z-10">
         <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">Secure Tunnel Duration Remaining</p>
-        <p className="text-3xl font-mono font-bold mt-2 text-white tracking-widest">{formatDisplayTime(timeRemaining)}</p>
-        
-        <button 
-          onClick={handleAdWatchReward}
-          className="w-full mt-4 bg-amber-500 hover:bg-amber-600 text-neutral-950 font-bold text-xs py-3 px-4 rounded-xl uppercase tracking-wider transition-colors"
-        >
+        <p className="text-3xl font-mono font-bold mt-2 text-white tracking-widest">
+          {Math.floor(timeRemaining / 3600).toString().padStart(2, '0')}:
+          {Math.floor((timeRemaining % 3600) / 60).toString().padStart(2, '0')}:
+          {(timeRemaining % 60).toString().padStart(2, '0')}
+        </p>
+        <button onClick={() => setTimeRemaining((prev) => prev + 7200)} className="w-full mt-4 bg-amber-500 hover:bg-amber-600 text-neutral-950 font-bold text-xs py-3 px-4 rounded-xl uppercase tracking-wider transition-colors">
           +2 Hours Free (Watch Ad)
         </button>
       </div>
+
+      {isDrawerOpen && (
+        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm z-50 flex flex-col justify-end transition-all duration-300">
+          <div className="bg-neutral-950 border-t border-neutral-800 rounded-t-3xl w-full p-6 space-y-4 max-h-[60vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-neutral-800 pb-3">
+              <h3 className="text-sm font-bold uppercase tracking-wider text-gray-400">Select Edge Gateway Node</h3>
+              <button onClick={() => setIsDrawerOpen(false)} className="text-gray-500 hover:text-white font-bold text-sm">CLOSE</button>
+            </div>
+            <div className="space-y-2">
+              {servers.map((srv) => (
+                <button
+                  key={srv.server_id}
+                  onClick={() => {
+                    setSelectedServer(srv);
+                    setIsDrawerOpen(false);
+                  }}
+                  className={`w-full flex items-center justify-between p-4 rounded-xl border transition-all text-left ${selectedServer?.server_id === srv.server_id ? 'bg-amber-500/10 border-amber-500 text-amber-500' : 'bg-neutral-900 border-neutral-800 text-white hover:bg-neutral-800'}`}
+                >
+                  <div className="flex flex-col">
+                    <span className="font-bold text-sm">{srv.server_name}</span>
+                    <span className="text-xs text-gray-500 mt-0.5">IP: {srv.endpoint_ip}</span>
+                  </div>
+                  {selectedServer?.server_id === srv.server_id && <span className="text-xs font-bold uppercase tracking-widest">ACTIVE</span>}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

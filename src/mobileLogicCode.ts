@@ -1,10 +1,10 @@
 export interface VpnConfig {
+  server_id: string;
   server_name: string;
+  country_code: string;
   endpoint_ip: string;
   endpoint_port: number;
   server_public_key: string;
-  client_private_key: string;
-  client_address: string;
   dns: string;
   obfuscation: {
     jc: number;
@@ -20,21 +20,21 @@ export interface VpnConfig {
 
 export type ChameleonState = 'DISCONNECTED' | 'CONNECTING' | 'CONNECTED';
 
-export async function fetchLiveVpnProfile(): Promise<VpnConfig | null> {
-  const rawConfigUrl = "https://gist.githubusercontent.com/niyibizisteven13-ux/746f4394fa1a51a084bfb209b5aa662f/raw/config.json";
-  const CACHE_KEY = "litron_cached_vpn_profile";
+export async function fetchAllVpnProfiles(): Promise<VpnConfig[]> {
+  const rawConfigUrl = "https://githubusercontent.com";
+  const CACHE_KEY = "litron_cached_vpn_array";
 
   try {
     const response = await fetch(rawConfigUrl);
-    if (!response.ok) throw new Error("Public network synchronization failed");
+    if (!response.ok) throw new Error("Multi-server sync failed");
     
-    const configMap: VpnConfig = await response.json();
-    localStorage.setItem(CACHE_KEY, JSON.stringify(configMap));
-    return configMap;
+    const serverList: VpnConfig[] = await response.json();
+    localStorage.setItem(CACHE_KEY, JSON.stringify(serverList));
+    return serverList;
   } catch (error) {
-    console.warn("Using offline fallback cache node...", error);
+    console.warn("Pulling server network layout map from local cache memory...", error);
     const cachedData = localStorage.getItem(CACHE_KEY);
-    return cachedData ? JSON.parse(cachedData) : null;
+    return cachedData ? JSON.parse(cachedData) : [];
   }
 }
 
