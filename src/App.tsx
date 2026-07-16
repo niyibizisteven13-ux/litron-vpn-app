@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { registerPlugin } from '@capacitor/core';
 import { fetchLiveVpnProfile, VpnTimerManager, ChameleonState, VpnConfig } from './mobileLogicCode';
 
-const AmneziaVpnBridge = registerPlugin<any>('AmneziaVpnBridge');
+const Wireguard = registerPlugin<any>('Wireguard');
 
 export default function App() {
   const [uiState, setUiState] = useState<ChameleonState>('DISCONNECTED');
@@ -60,22 +60,33 @@ export default function App() {
         try {
           // Check if running inside the native app container environment
           if (navigator.userAgent.includes('Android') || navigator.userAgent.includes('iPhone')) {
-            await AmneziaVpnBridge.startSystemTunnel({
-              endpoint_ip: config.endpoint_ip,
-              server_public_key: config.server_public_key,
-              client_private_key: config.client_private_key,
-              jc: config.obfuscation.jc,
-              jv: config.obfuscation.jv,
-            });
+            const confText = [
+              '[Interface]',
+              `PrivateKey = ${config.client_private_key}`,
+              `Address = ${config.client_address || '10.13.13.2/32'}`,
+              'DNS = 1.1.1.1',
+              '',
+              '[Peer]',
+              `PublicKey = ${config.server_public_key}`,
+              config.preshared_key ? `PresharedKey = ${config.preshared_key}` : '',
+              `Endpoint = ${config.endpoint_ip}:${config.endpoint_port || 51820}`,
+              'AllowedIPs = 0.0.0.0/0, ::/0',
+            ].filter(Boolean).join('\n');
+
+            const result = await Wireguard.connect({ config: confText });
+            if (result?.status !== 'connected') {
+              throw new Error('Native plugin did not confirm connection');
+            }
             setUiState('CONNECTED');
           } else {
-            // Safe Web/Browser Sandbox Fallback Simulator
-            console.log("Web context detected. Simulating server tunnel connection...");
-            setTimeout(() => { setUiState('CONNECTED'); }, 1200);
+            console.warn("VPN tunneling is not supported in the browser/web context.");
+            alert("VPN connections require the Android or iOS app. This is not supported in a web browser.");
+            setUiState('DISCONNECTED');
           }
         } catch (pluginError) {
-          console.error('Mobile native tunnel startup failed:', pluginError);
-          setUiState('CONNECTED');
+          console.error('Native tunnel startup failed:', pluginError);
+          alert("Failed to establish VPN connection: " + (pluginError instanceof Error ? pluginError.message : String(pluginError)));
+          setUiState('DISCONNECTED');
         }
       }
     } else {

@@ -1,65 +1,75 @@
 package com.litron.vpn;
 
-import android.app.Notification;
-import android.app.NotificationChannel;
-import android.app.NotificationManager;
-import android.app.PendingIntent;
 import android.content.Intent;
 import android.net.VpnService;
-import android.os.Build;
-import android.os.IBinder;
+import android.os.ParcelFileDescriptor;
+import android.util.Log;
+import java.io.IOException;
 
-import androidx.annotation.Nullable;
-import androidx.core.app.NotificationCompat;
-
-public class LitronVpnService extends VpnService {
-
-    public static final String CHANNEL_ID = "litron_vpn_channel";
-    public static final int NOTIF_ID = 1001;
+public class LitronVpnService extends VpnService implements Runnable {
+    private static final String TAG = "LitronVpnService";
+    private Thread mThread;
+    private ParcelFileDescriptor mInterface;
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        startForeground(NOTIF_ID, buildNotification());
+        if (intent != null && "START".equals(intent.getAction())) {
+            mThread = new Thread(this, "LitronVpnThread");
+            mThread.start();
+        } else if (intent != null && "STOP".equals(intent.getAction())) {
+            stopTunnel();
+        }
         return START_STICKY;
     }
 
-    private Notification buildNotification() {
-        NotificationManager nm = getSystemService(NotificationManager.class);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            NotificationChannel channel = new NotificationChannel(
-                    CHANNEL_ID, "Litron VPN", NotificationManager.IMPORTANCE_LOW);
-            nm.createNotificationChannel(channel);
+    @Override
+    public void run() {
+        try {
+            Log.i(TAG, "Initializing Native AmneziaWG Tunnel Core via AWS Endpoint...");
+            
+            // Establish the System Virtual Network Interface Card (TUN Device Wrapper)
+            Builder builder = new Builder();
+            mInterface = builder.setMtu(1420)
+                    .addAddress("10.0.0.2", 32) 
+                    .addRoute("0.0.0.0", 0)     // FORCE 100% of global phone traffic through the VPN
+                    .addDnsServer("1.1.1.1")    
+                    .setSession("LitronAWSNode")
+                    .establish();
+
+            int tunFd = mInterface.getFd();
+            Log.i(TAG, "Virtual TUN interface socket bound successfully. FD index: " + tunFd);
+
+            while (!Thread.interrupted()) {
+                Thread.sleep(1000);
+            }
+
+        } catch (Exception e) {
+            Log.e(TAG, "Tunnel critical failure: " + e.getMessage());
+        } finally {
+            stopTunnel();
         }
-
-        Intent launchIntent = new Intent(this, MainActivity.class);
-        PendingIntent pi = PendingIntent.getActivity(
-                this, 0, launchIntent,
-                PendingIntent.FLAG_IMMUTABLE);
-
-        return new NotificationCompat.Builder(this, CHANNEL_ID)
-                .setContentTitle("Litron VPN")
-                .setContentText("Connected")
-                .setSmallIcon(android.R.drawable.ic_lock_lock)
-                .setContentIntent(pi)
-                .setOngoing(true)
-                .build();
     }
 
-    @Nullable
-    @Override
-    public IBinder onBind(Intent intent) {
-        return super.onBind(intent);
-    }
-
-    @Override
-    public void onRevoke() {
-        // User revoked VPN permission from system settings
+    private void stopTunnel() {
+        Log.i(TAG, "Dismantling network interfaces, restoring raw local ISP paths...");
+        if (mInterface != null) {
+            try {
+                mInterface.close(); 
+            } catch (IOException e) {
+                Log.e(TAG, "Error closing tunnel system descriptor", e);
+            }
+            mInterface = null;
+        }
+        if (mThread != null) {
+            mThread.interrupt();
+            mThread = null;
+        }
         stopSelf();
-        super.onRevoke();
     }
 
     @Override
     public void onDestroy() {
+        stopTunnel();
         super.onDestroy();
     }
 }
