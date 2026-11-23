@@ -6,7 +6,8 @@ import com.getcapacitor.BridgeActivity;
 public class MainActivity extends BridgeActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
         registerPlugin(WireguardPlugin.class);
+        registerPlugin(RewardedAdsPlugin.class);
+        super.onCreate(savedInstanceState);
     }
 }

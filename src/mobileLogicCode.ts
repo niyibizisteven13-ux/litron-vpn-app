@@ -1,7 +1,7 @@
 export type ChameleonState = "DISCONNECTED" | "CONNECTING" | "CONNECTED";
 
 export class VpnTimerManager {
-  private static STORAGE_KEY = "litron_tunnel_balance_seconds";
+  private static STORAGE_KEY = "litron_rewarded_tunnel_seconds";
 
   static getRemainingTime(): number {
     const savedTime = localStorage.getItem(this.STORAGE_KEY);
@@ -12,7 +12,7 @@ export class VpnTimerManager {
   }
   static addRewardTime(): number {
     const currentBalance = this.getRemainingTime();
-    const newBalance = currentBalance + 7200;
+    const newBalance = currentBalance + 30 * 60;
     this.saveRemainingTime(newBalance);
     return newBalance;
   }

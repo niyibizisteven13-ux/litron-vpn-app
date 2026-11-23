@@ -14,6 +14,10 @@ const Wireguard = registerPlugin<{
   disconnect(): Promise<void>;
   getStatus(): Promise<TunnelStatus>;
 }>('Wireguard');
+const RewardedAds = registerPlugin<{
+  show(): Promise<{ earned: boolean }>;
+}>('RewardedAds');
+
 const supportsTunnel = Capacitor.getPlatform() === 'android';
 
 export default function App() {
@@ -21,6 +25,7 @@ export default function App() {
   const [timeRemaining, setTimeRemaining] = useState<number>(VpnTimerManager.getRemainingTime());
   const [profile, setProfile] = useState<{ name: string; config: string } | null>(null);
   const [error, setError] = useState('');
+  const [adBusy, setAdBusy] = useState(false);
   const [status, setStatus] = useState<TunnelStatus | null>(null);
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -110,6 +115,19 @@ export default function App() {
     }
   };
 
+  async function watchRewardedAd() {
+    setAdBusy(true);
+    setError('');
+    try {
+      const { earned } = await RewardedAds.show();
+      if (earned) setTimeRemaining(VpnTimerManager.addRewardTime());
+    } catch {
+      setError('The rewarded ad is unavailable. Try again shortly.');
+    } finally {
+      setAdBusy(false);
+    }
+  }
+
   const currentTheme = themeStyles[uiState];
 
   return (
@@ -182,17 +200,17 @@ export default function App() {
       )}
       {error && <p role="alert" className="text-sm text-red-400">{error}</p>}
 
-      <div className="w-full max-w-sm bg-neutral-900/50 backdrop-blur-md rounded-2xl p-5 border border-neutral-800 text-center mb-6 z-10">
+      {supportsTunnel && <div className="w-full max-w-sm bg-neutral-900/50 backdrop-blur-md rounded-2xl p-5 border border-neutral-800 text-center mb-6 z-10">
         <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">Secure Tunnel Duration Remaining</p>
         <p className="text-3xl font-mono font-bold mt-2 text-white tracking-widest">
           {Math.floor(timeRemaining / 3600).toString().padStart(2, '0')}:
           {Math.floor((timeRemaining % 3600) / 60).toString().padStart(2, '0')}:
           {(timeRemaining % 60).toString().padStart(2, '0')}
         </p>
-        <button onClick={() => setTimeRemaining(VpnTimerManager.addRewardTime())} className="w-full mt-4 bg-amber-500 hover:bg-amber-600 text-neutral-950 font-bold text-xs py-3 px-4 rounded-xl uppercase tracking-wider transition-colors">
-          +2 Hours Free (Watch Ad)
+        <button type="button" disabled={adBusy} onClick={watchRewardedAd} className="w-full mt-4 bg-amber-500 hover:bg-amber-600 text-neutral-950 font-bold text-xs py-3 px-4 rounded-xl uppercase tracking-wider transition-colors">
+          {adBusy ? 'Opening ad…' : 'Watch a test ad for 30 minutes of VPN time'}
         </button>
-      </div>
+      </div>}
 
     </div>
   );
