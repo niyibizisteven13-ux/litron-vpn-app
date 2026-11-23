@@ -2,9 +2,17 @@ import React, { useState, useEffect, useRef } from 'react';
 import { VpnTimerManager, type ChameleonState } from './mobileLogicCode';
 import { Capacitor, registerPlugin } from '@capacitor/core';
 
+type TunnelStatus = {
+  state: 'UP' | 'DOWN';
+  latestHandshake?: number;
+  receivedBytes?: number;
+  sentBytes?: number;
+};
+
 const Wireguard = registerPlugin<{
   connect(options: { config: string }): Promise<{ status: string }>;
   disconnect(): Promise<void>;
+  getStatus(): Promise<TunnelStatus>;
 }>('Wireguard');
 const supportsTunnel = Capacitor.getPlatform() === 'android';
 
@@ -13,6 +21,7 @@ export default function App() {
   const [timeRemaining, setTimeRemaining] = useState<number>(VpnTimerManager.getRemainingTime());
   const [profile, setProfile] = useState<{ name: string; config: string } | null>(null);
   const [error, setError] = useState('');
+  const [status, setStatus] = useState<TunnelStatus | null>(null);
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -21,6 +30,29 @@ export default function App() {
     CONNECTING: { bg: '#040E14', accent: '#22D3EE', statusText: 'Starting WireGuard tunnel...', pulseClass: 'animate-pulse' },
     CONNECTED: { bg: '#05130C', accent: '#10B981', statusText: 'WireGuard tunnel active', pulseClass: '' }
   };
+
+  useEffect(() => {
+    if (!supportsTunnel || uiState === 'CONNECTING') return;
+    let stopped = false;
+    let timer: ReturnType<typeof setTimeout>;
+    async function refreshStatus() {
+      try {
+        const current = await Wireguard.getStatus();
+        if (stopped) return;
+        setStatus(current);
+        setUiState(current.state === 'UP' ? 'CONNECTED' : 'DISCONNECTED');
+      } catch {
+        if (!stopped) setStatus(null);
+      } finally {
+        if (!stopped) timer = setTimeout(refreshStatus, 2000);
+      }
+    }
+    void refreshStatus();
+    return () => {
+      stopped = true;
+      clearTimeout(timer);
+    };
+  }, [uiState]);
 
   useEffect(() => {
     if (uiState === 'CONNECTED' && timeRemaining > 0) {
@@ -108,6 +140,19 @@ export default function App() {
           </p>
         </div>
       </div>
+
+      {uiState === 'CONNECTED' && (
+        <div className="text-center text-sm text-gray-300" aria-live="polite">
+          {status?.state === 'UP' ? (
+            <>
+              <p>{status.latestHandshake
+                ? `Last gateway handshake: ${new Date(status.latestHandshake).toLocaleTimeString()}`
+                : 'Waiting for a gateway handshake. Open a page to generate traffic.'}</p>
+              <p>Received {status.receivedBytes ?? 0} bytes · Sent {status.sentBytes ?? 0} bytes</p>
+            </>
+          ) : <p>Checking WireGuard gateway status…</p>}
+        </div>
+      )}
 
       {supportsTunnel ? (
         <label className="flex flex-col gap-2 text-sm">

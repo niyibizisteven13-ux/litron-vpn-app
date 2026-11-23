@@ -12,8 +12,10 @@ import com.getcapacitor.annotation.ActivityCallback;
 import com.getcapacitor.annotation.CapacitorPlugin;
 
 import com.wireguard.android.backend.GoBackend;
+import com.wireguard.android.backend.Statistics;
 import com.wireguard.android.backend.Tunnel;
 import com.wireguard.config.Config;
+import com.wireguard.crypto.Key;
 
 import java.io.BufferedReader;
 import java.io.StringReader;
@@ -21,8 +23,8 @@ import java.io.StringReader;
 @CapacitorPlugin(name = "Wireguard")
 public class WireguardPlugin extends Plugin {
 
-    private GoBackend backend;
-    private Tunnel tunnel;
+    private static GoBackend backend;
+    private static Tunnel tunnel;
 
     @PluginMethod
     public void connect(PluginCall call) {
@@ -52,7 +54,13 @@ public class WireguardPlugin extends Plugin {
 
     private void doConnect(PluginCall call) {
         try {
-            backend = new GoBackend(getContext().getApplicationContext());
+            if (backend != null && tunnel != null && backend.getState(tunnel) == Tunnel.State.UP) {
+                call.reject("A WireGuard tunnel is already running");
+                return;
+            }
+            if (backend == null) {
+                backend = new GoBackend(getContext().getApplicationContext());
+            }
             Config config = Config.parse(new BufferedReader(new StringReader(call.getString("config", ""))));
 
             tunnel = new Tunnel() {
@@ -98,10 +106,20 @@ public class WireguardPlugin extends Plugin {
     public void getStatus(PluginCall call) {
         JSObject ret = new JSObject();
         try {
-            if (backend != null && tunnel != null) {
-                ret.put("state", backend.getState(tunnel).toString());
-            } else {
-                ret.put("state", "DOWN");
+            boolean up = backend != null && tunnel != null && backend.getState(tunnel) == Tunnel.State.UP;
+            ret.put("state", up ? "UP" : "DOWN");
+            if (up) {
+                Statistics statistics = backend.getStatistics(tunnel);
+                long latestHandshake = 0;
+                for (Key peer : statistics.peers()) {
+                    Statistics.PeerStats stats = statistics.peer(peer);
+                    if (stats != null) {
+                        latestHandshake = Math.max(latestHandshake, stats.latestHandshakeEpochMillis());
+                    }
+                }
+                ret.put("latestHandshake", latestHandshake);
+                ret.put("receivedBytes", statistics.totalRx());
+                ret.put("sentBytes", statistics.totalTx());
             }
             call.resolve(ret);
         } catch (Exception e) {

@@ -1,5 +1,7 @@
 name: Build Litron Android APK
 on:
+  pull_request:
+  workflow_dispatch:
   push:
     branches:
       - main
