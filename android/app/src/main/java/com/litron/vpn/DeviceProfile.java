@@ -38,7 +38,7 @@ final class DeviceProfile {
 
     static String enroll(Context context) throws Exception {
         KeyPair pair = deviceKey(context);
-        URL url = new URL("https://www.bwenge.space/api/litron/peers");
+        URL url = new URL("https://bwenge.space/api/litron/peers");
         HttpsURLConnection request = (HttpsURLConnection) url.openConnection();
         try {
             request.setRequestMethod("POST");
