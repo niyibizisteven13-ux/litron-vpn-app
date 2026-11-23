@@ -23,7 +23,6 @@ public class WireguardPlugin extends Plugin {
 
     private GoBackend backend;
     private Tunnel tunnel;
-    private String pendingConfigText;
 
     @PluginMethod
     public void connect(PluginCall call) {
@@ -32,9 +31,6 @@ public class WireguardPlugin extends Plugin {
             call.reject("Missing 'config' string (WireGuard .conf contents)");
             return;
         }
-
-        pendingConfigText = configText;
-        call.setKeepAlive(true);
 
         Intent prepareIntent = VpnService.prepare(getContext());
         if (prepareIntent != null) {
@@ -56,8 +52,8 @@ public class WireguardPlugin extends Plugin {
 
     private void doConnect(PluginCall call) {
         try {
-            backend = new GoBackend(getContext());
-            Config config = Config.parse(new BufferedReader(new StringReader(pendingConfigText)));
+            backend = new GoBackend(getContext().getApplicationContext());
+            Config config = Config.parse(new BufferedReader(new StringReader(call.getString("config", ""))));
 
             tunnel = new Tunnel() {
                 @Override
@@ -70,14 +66,16 @@ public class WireguardPlugin extends Plugin {
                 }
             };
 
-            getContext().startService(new Intent(getContext(), LitronVpnService.class));
-            backend.setState(tunnel, Tunnel.State.UP, config);
+            if (backend.setState(tunnel, Tunnel.State.UP, config) != Tunnel.State.UP) {
+                call.reject("WireGuard tunnel did not start");
+                return;
+            }
 
             JSObject ret = new JSObject();
             ret.put("status", "connected");
             call.resolve(ret);
         } catch (Exception e) {
-            call.reject("Failed to connect: " + e.getMessage(), e);
+            call.reject("Could not start the WireGuard tunnel");
         }
     }
 
@@ -87,7 +85,6 @@ public class WireguardPlugin extends Plugin {
             if (backend != null && tunnel != null) {
                 backend.setState(tunnel, Tunnel.State.DOWN, null);
             }
-            getContext().stopService(new Intent(getContext(), LitronVpnService.class));
 
             JSObject ret = new JSObject();
             ret.put("status", "disconnected");

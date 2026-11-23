@@ -1,13 +1,1 @@
-[
-  {
-    "server_id": "aws-stockholm-1",
-    "server_name": "AWS Stockholm Edge",
-    "endpoint_ip": "13.50.247.15",
-    "endpoint_port": 51820,
-    "server_public_key": "Zgump1HgGmnMB+OiaMnjLjdg55mj+pZz0bChbDVDPiY=",
-    "client_private_key": "WNB7tYxPuFZl9XLZVoMcgEbxIsabnr6yofsGKh7Ah14=",
-    "client_address": "10.13.13.3/32",
-    "preshared_key": "R7Db20Es0UaNHHO729cB8uc6G5C3FABKxfAHkNeHK0I=",
-    "dns": "1.1.1.1"
-  }
-]
+[]
