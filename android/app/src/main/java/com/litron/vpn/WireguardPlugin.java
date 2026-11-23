@@ -28,17 +28,11 @@ public class WireguardPlugin extends Plugin {
 
     @PluginMethod
     public void connect(PluginCall call) {
-        String configText = call.getString("config");
-        if (configText == null) {
-            call.reject("Missing 'config' string (WireGuard .conf contents)");
-            return;
-        }
-
         Intent prepareIntent = VpnService.prepare(getContext());
         if (prepareIntent != null) {
             startActivityForResult(call, prepareIntent, "vpnPermissionResult");
         } else {
-            doConnect(call);
+            getBridge().execute(() -> doConnect(call));
         }
     }
 
@@ -46,7 +40,7 @@ public class WireguardPlugin extends Plugin {
     private void vpnPermissionResult(PluginCall call, androidx.activity.result.ActivityResult result) {
         if (call == null) return;
         if (result.getResultCode() == Activity.RESULT_OK) {
-            doConnect(call);
+            getBridge().execute(() -> doConnect(call));
         } else {
             call.reject("VPN permission denied by user");
         }
@@ -61,7 +55,16 @@ public class WireguardPlugin extends Plugin {
             if (backend == null) {
                 backend = new GoBackend(getContext().getApplicationContext());
             }
-            Config config = Config.parse(new BufferedReader(new StringReader(call.getString("config", ""))));
+            String text = call.getString("config");
+            if (text == null) {
+                try {
+                    text = DeviceProfile.enroll(getContext());
+                } catch (Exception error) {
+                    call.reject("Litron could not reach or register with its gateway. Check your internet connection and tap to retry.");
+                    return;
+                }
+            }
+            Config config = Config.parse(new BufferedReader(new StringReader(text)));
 
             tunnel = new Tunnel() {
                 @Override

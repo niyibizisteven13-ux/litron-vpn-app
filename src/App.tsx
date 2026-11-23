@@ -10,7 +10,7 @@ type TunnelStatus = {
 };
 
 const Wireguard = registerPlugin<{
-  connect(options: { config: string }): Promise<{ status: string }>;
+  connect(options?: { config: string }): Promise<{ status: string }>;
   disconnect(): Promise<void>;
   getStatus(): Promise<TunnelStatus>;
 }>('Wireguard');
@@ -98,14 +98,14 @@ export default function App() {
       return;
     }
 
-    if (!profile || timeRemaining <= 0) return;
+    if (timeRemaining <= 0) return;
     setUiState('CONNECTING');
     try {
-      const result = await Wireguard.connect({ config: profile.config });
+      const result = await Wireguard.connect(profile ? { config: profile.config } : undefined);
       if (result.status !== 'connected') throw new Error();
       setUiState('CONNECTED');
-    } catch {
-      setError('Could not start WireGuard. Check the profile and allow Android VPN access.');
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Connection failed. Tap to retry.');
       setUiState('DISCONNECTED');
     }
   };
@@ -124,7 +124,7 @@ export default function App() {
         <button 
           type="button"
           aria-label={uiState === 'CONNECTED' ? 'Disconnect WireGuard' : 'Connect WireGuard'}
-          disabled={!supportsTunnel || uiState === 'CONNECTING' || (uiState === 'DISCONNECTED' && (!profile || timeRemaining <= 0))}
+          disabled={!supportsTunnel || uiState === 'CONNECTING' || (uiState === 'DISCONNECTED' && timeRemaining <= 0)}
           onClick={handlePowerTap}
           style={{ borderColor: currentTheme.accent, boxShadow: uiState === 'CONNECTING' ? `0 0 25px ${currentTheme.accent}` : 'none' }}
           className={`w-44 h-44 rounded-full border-4 flex items-center justify-center bg-transparent transition-all duration-300 transform active:scale-95 ${currentTheme.pulseClass}`}
@@ -155,7 +155,8 @@ export default function App() {
       )}
 
       {supportsTunnel ? (
-        <label className="flex flex-col gap-2 text-sm">
+        <details className="text-sm"><summary>Advanced settings</summary>
+        <label className="flex flex-col gap-2 mt-2">
           Import WireGuard profile (.conf)
           <input
             type="file"
@@ -177,8 +178,10 @@ export default function App() {
           />
           {profile?.name}
         </label>
+        {profile && <button disabled={uiState !== 'DISCONNECTED'} onClick={() => setProfile(null)}>Use automatic setup</button>}
+        </details>
       ) : (
-        <p className="text-sm">Open Litron on Android to import a profile and start WireGuard.</p>
+        <p className="text-sm">Open Litron on Android and tap the power button to connect.</p>
       )}
       {error && <p role="alert" className="text-sm text-red-400">{error}</p>}
 
